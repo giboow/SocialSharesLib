@@ -6,6 +6,8 @@
  * @version 1.0
  */
 
+
+
 /**
  * Get number of Google+ shares
  * @param string $url
@@ -19,17 +21,20 @@ function getGoodlePlusShares($url)
             return $count;
         }
     }
-
     $curl = curl_init();
-    curl_setopt($curl, CURLOPT_URL, "https://clients6.google.com/rpc");
-    curl_setopt($curl, CURLOPT_POST, 1);
-    curl_setopt($curl, CURLOPT_POSTFIELDS, '[{"method":"pos.plusones.get","id":"p","params":{"nolog":true,"id":"' . $url . '","source":"widget","userId":"@viewer","groupId":"@self"},"jsonrpc":"2.0","key":"p","apiVersion":"v1"}]');
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-type: application/json'));
-    $curl_results = curl_exec ($curl);
-    curl_close ($curl);
-    $json = json_decode($curl_results, true);
-    $count = intval( $json[0]['result']['metadata']['globalCounts']['count'] );
+      curl_setopt($curl, CURLOPT_URL, "https://clients6.google.com/rpc");
+      curl_setopt($curl, CURLOPT_POST, 1);
+      curl_setopt($curl, CURLOPT_POSTFIELDS, '[{"method":"pos.plusones.get","id":"p","params":{"nolog":true,"id":"' . $url . '","source":"widget","userId":"@viewer","groupId":"@self"},"jsonrpc":"2.0","key":"p","apiVersion":"v1"}]');
+      curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-type: application/json'));
+      $curlResults = curl_exec ($curl);
+      curl_close ($curl);
+  
+
+    if ($curlResults) {
+        $datas = json_decode($curlResults, true);
+        $count = intval($datas[0]['result']['metadata']['globalCounts']['count'] );
+    }
 
     if (defined('SOCIAL_CACHE_TTL') && function_exists('apc_store')) {
         apc_store($id, $count, SOCIAL_CACHE_TTL);
@@ -52,9 +57,11 @@ function getFacebookShares($url)
         }
     }
 
-    $json = file_get_contents(
-        'http://api.ak.facebook.com/restserver.php?v=1.0&method=links.getStats&urls='.urlencode($url).'&format=json'
-    );
+    $url = 'http://api.ak.facebook.com/restserver.php?v=1.0&method=links.getStats&urls='
+            . urlencode($url) . '&format=json';
+
+    $json = file_get_contents($url);
+  
     $datas = json_decode($json);
     if (isset($datas[0])) {
         $count = $datas[0]->total_count;
@@ -83,17 +90,14 @@ function getTwitterShares($url)
             return $count;
         }
     }
+    $url = "https://cdn.api.twitter.com/1/urls/count.json?url=".urlencode($url);
 
-    $curl = curl_init();
-    curl_setopt($curl, CURLOPT_URL, "https://cdn.api.twitter.com/1/urls/count.json?url=".urlencode($url));
-    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-type: application/json'));
-    $curl_results = curl_exec ($curl);
-    curl_close ($curl);
-    $json = json_decode($curl_results, true);
 
-    if (isset($json['count'])) {
-        $count = $json['count'];
+    $json = file_get_contents($url);
+    $datas = json_decode($json, true);
+
+    if (isset($datas['count'])) {
+        $count = $datas['count'];
     } else {
         $count = null;
     }
@@ -119,7 +123,8 @@ function getDeliciousShares($url)
         }
     }
 
-    $json = file_get_contents('http://feeds.delicious.com/v2/json/urlinfo/data?url='.urlencode($url));
+    $url = 'http://feeds.delicious.com/v2/json/urlinfo/data?url='.urlencode($url);
+    $json = file_get_contents($url);
     $datas = json_decode($json);
     if (isset($datas->total_posts)) {
         $count = $datas->total_posts;
@@ -148,10 +153,12 @@ function getPinterestShares($url) {
         }
     }
 
-    $url = urlencode($url);
+    $url = 'http://api.pinterest.com/v1/urls/count.json?callback=receiveCount&url='.urlencode($url);
+
+
     $json = preg_replace(
         '/^receiveCount\((.*)\)$/', "\\1",
-        file_get_contents('http://api.pinterest.com/v1/urls/count.json?callback=receiveCount&url='.$url)
+        file_get_contents($url)
     );
     $datas = json_decode($json);
     if (isset($datas->count)) {
@@ -175,12 +182,12 @@ function getPinterestShares($url) {
 function getSocialShares($url) {
 
     $id = 'social_count_global_'.md5($url);
-    if (defined('SOCIAL_CACHE_TTL') && function_exists('apc_fetch')) {
+    if (!isset($_GET['testP']) && defined('SOCIAL_CACHE_TTL') && function_exists('apc_fetch')) {
         if (($counts = apc_fetch($id)) !== false) {
-            return $counts;
+                        return $counts;
         }
     }
-
+    
     $counts = array(
         'facebook'=> getFacebookShares($url),
         'twitter'=> getTwitterShares($url),
